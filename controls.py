@@ -182,7 +182,7 @@ class RecordView(CustomView):
 
         super().__init__(handler_error, page)
 
-        self.controls = [BackgroundImage(self.storage.background_image, self.doc_field)]
+        self.controls.append(BackgroundImage(self.storage.background_image, self.doc_field))
         self.padding = 0
         self.spacing = 51
 
@@ -232,15 +232,32 @@ class SelectRecordView(RecordView):
 
 
 class CreateRecordView(RecordView):
-    def save(self, _):
-        content = self.doc_field.value
-        create_record(content)
+    def __init__(self, handler_error, page):
+        self.date_picker = ft.DatePicker(on_change=self.select_date)
 
+        super().__init__(handler_error, page)
+        self.page.overlay.clear()
+        self.page.overlay.append(self.date_picker)
+
+    def save(self, _):
+        create_record(self.doc_field.value)
         self.page.go("/records/" + get_date(datetime.now()))
+
+    def select_date(self, _):
+        date = get_date(self.date_picker.value)
+        if exists_record(date):
+            self.hadnler_error("Под этой датой уже есть запись")
+        else:
+            edit_record(date, self.doc_field.value)
+            self.page.go("/records/" + date)
 
     def init(self):
         self.route = "/create-record"
-        self.appbar = CustomAppBar("Создание записи", None, [ft.IconButton(ft.icons.SAVE, on_click=self.save)])
+        self.appbar = CustomAppBar("Создание записи", None,
+                                   [ft.IconButton(ft.icons.SAVE, on_click=self.save, tooltip="Сохранить"),
+                                    ft.IconButton(ft.icons.SAVE_AS,
+                                                  on_click=lambda _: self.date_picker.pick_date(),
+                                                  tooltip="Сохранить под датой")])
 
 
 class SettingsView(CustomView):

@@ -243,14 +243,27 @@ class SettingsView(CustomView):
         if not self.storage.background_image:
             self.bg_image.visible = False
 
-        self.font_family_field = ft.TextField(label="Название шрифта", value=self.storage.font_family)
+        self.font_family_field = ft.TextField(label="Название шрифта",
+                                              value=self.storage.font_family,
+                                              on_change=self.change_font_family,
+                                              text_style=ft.TextStyle(font_family=self.storage.font_family))
         self.font_size_field = ft.TextField(label="Размер шрифта",
                                             value=self.storage.font_size,
-                                            keyboard_type=ft.KeyboardType.NUMBER)
+                                            keyboard_type=ft.KeyboardType.NUMBER,
+                                            text_size=self.storage.font_size,
+                                            on_change=self.change_font_size)
         self.font_color_picker = ColorPicker()
         self.font_color_picker.color = self.storage.font_color
 
         super().__init__(handler_error, page)
+
+    def change_font_family(self, e):
+        self.font_family_field.text_style.font_family = self.font_family_field.value
+        self.font_family_field.update()
+
+    def change_font_size(self, e):
+        self.font_size_field.text_size = self.font_size_field.value
+        self.font_size_field.update()
 
     def select_background(self, e: ft.FilePickerResultEvent):
         if e.files and len(e.files) != 0 and not isdir(e.files[0].path):

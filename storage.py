@@ -13,12 +13,14 @@ class ClientStorage:
         self.font_family = self.get("font-family", "Times New Roman")
         self.font_size = self.get('font-size', 18)
         self.font_color = self.get("font-color", "#000000")
+        self.text_align = self.get("text-align", "center")
 
     def save(self):
-        self.set("background-image", self.background_image)
-        self.set("font-family", self.font_family)
-        self.set("font-size", self.font_size)
-        self.set("font-color", self.font_color)
+        for attribute in self.__dir__()[2:]:
+            if attribute == "__module__":
+                break
+
+            self.set(attribute.replace("_", "-"), self.__getattribute__(attribute))
 
     @property
     def theme_mode(self):

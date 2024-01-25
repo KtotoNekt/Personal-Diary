@@ -14,6 +14,7 @@ if not exists("records"):
 
 def main(page: ft.Page):
     def route_change(e):
+        print(page.route)
         page.views.clear()
         page.views.append(
             MainView(open_dialog_error, page)
@@ -24,6 +25,7 @@ def main(page: ft.Page):
 
         if troute.route == "/create-record":
             if exists_record(get_date(datetime.now())):
+                page.go("/")
                 open_dialog_error("Вы сегодня сделали запись! Для ее редактирования вам нужно нажать на \"Выбрать "
                                   "запись\" и выбрать соответствующую дату")
             else:
@@ -42,6 +44,7 @@ def main(page: ft.Page):
         page.update()
 
     def view_pop(e):
+        print("Pop")
         page.views.pop()
         page.go(page.views[-1].route)
 

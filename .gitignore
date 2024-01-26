@@ -1,5 +1,5 @@
-*.odt
 venv
 .idea/
 __pycache__/
 test-flet.py
+records/*.txt

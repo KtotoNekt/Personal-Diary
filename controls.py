@@ -40,7 +40,8 @@ class CustomAlertDialog(ft.AlertDialog):
             actions=[
                 confirm_action,
                 cancel_action
-            ]
+            ],
+            modal=True
         )
 
         self.page = page

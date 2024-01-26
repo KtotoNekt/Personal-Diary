@@ -4,6 +4,7 @@ from os.path import isdir
 from diary import *
 from datetime import datetime
 from storage import get_storage
+from time import sleep
 
 
 class DocumentField(ft.TextField):
@@ -22,6 +23,36 @@ class BackgroundImage(ft.Container):
             expand=True,
             content=content
         ),
+
+
+class CustomAlertDialog(ft.AlertDialog):
+    def __init__(self, page: ft.Page,
+                 title: str, content: str,
+                 confirm_action: ft.TextButton,
+                 cancel_action: ft.TextButton = None):
+
+        if not cancel_action:
+            cancel_action = ft.TextButton("Отмена", on_click=lambda _: self.page.close_dialog())
+
+        super().__init__(
+            title=ft.Text(title),
+            content=ft.Text(content),
+            actions=[
+                confirm_action,
+                cancel_action
+            ]
+        )
+
+        self.page = page
+
+    def close_dlg(self):
+        self.page.close_dialog()
+        sleep(0.1)
+
+    def open_dlg(self):
+        self.page.dialog = self
+        self.open = True
+        self.page.update()
 
 
 class CustomAppBar(ft.AppBar):
@@ -193,29 +224,19 @@ class SelectRecordView(RecordView):
         self.save_button = ft.IconButton(ft.icons.SAVE, on_click=self.save, tooltip="Сохранить", visible=False)
         self.cancel_button = ft.IconButton(ft.icons.CANCEL, visible=False,
                                            on_click=self.cancel, tooltip="Сбросить до первоначального вида")
-        # self.dlg_confirm = ft.AlertDialog(
-        #     title=ft.Text("Подтверждение"),
-        #     content=ft.Text("Данная операция не обратима. Вы точно хотите удалить данную запись?"),
-        #     actions=[
-        #         ft.TextButton("Да, удалите эту запись", on_click=self.delete_record),
-        #         ft.TextButton("Отмена", on_click=lambda _: self.close_dlg_confirm)
-        #     ]
-        # )
 
         super().__init__(handler_error, page)
+
+        self.dlg_confirm = CustomAlertDialog(
+            page,
+            title="Подтверждение",
+            content="Данная операция не обратима. Вы точно хотите удалить данную запись?",
+            confirm_action=ft.TextButton("Да, удалите эту запись", on_click=self.delete_record),
+        )
 
         self.doc_field.read_only = True
         self.doc_field.value = read_record(date)
         self.first_value = self.doc_field.value
-
-    # def close_dlg_confirm(self):
-    #     self.dlg_confirm.open = False
-    #     self.page.update()
-
-    def delete_record(self, _):
-        # self.close_dlg_confirm()
-        delete_record(self.date)
-        self.page.go("/")
 
     def cancel(self, _):
         self.doc_field.value = self.first_value
@@ -240,13 +261,17 @@ class SelectRecordView(RecordView):
 
         self.toggle_buttons()
 
-    # def open_confirm_dlg(self, _):
-    #     self.page.dialog = self.dlg_confirm
-    #     self.dlg_confirm.open = True
-    #     self.page.update()
+    def delete_record(self, _):
+        delete_record(self.date)
+        self.dlg_confirm.close_dlg()
+        self.page.go("/")
+
+    def keyboard_event_handler(self, e: ft.KeyboardEvent):
+        if e.ctrl and e.key == "S" and not self.doc_field.read_only:
+            self.save(e)
 
     def init(self):
-        delete_button = ft.IconButton(ft.icons.DELETE_FOREVER, on_click=self.delete_record)
+        delete_button = ft.IconButton(ft.icons.DELETE_FOREVER, on_click=lambda _: self.dlg_confirm.open_dlg())
 
         self.route = "/records/" + self.date
         self.appbar = CustomAppBar("Запись " + self.date, None,
@@ -256,14 +281,29 @@ class SelectRecordView(RecordView):
 class CreateRecordView(RecordView):
     def __init__(self, handler_error, page):
         self.date_picker = ft.DatePicker(on_change=self.select_date)
+        self.dlg_view_record = CustomAlertDialog(
+            page,
+            "Просмотр",
+            "Вы хотите просмотреть свою запись?",
+            ft.TextButton("Да", on_click=self.view_record),
+            ft.TextButton("Не сейчас", on_click=self.go_home)
+        )
 
         super().__init__(handler_error, page)
         self.page.overlay.clear()
         self.page.overlay.append(self.date_picker)
 
+    def go_home(self, _):
+        self.dlg_view_record.close_dlg()
+        self.page.go("/")
+
+    def view_record(self, _):
+        self.dlg_view_record.close_dlg()
+        self.page.go("/records/" + get_date(datetime.now()))
+
     def save(self, _):
         create_record(self.doc_field.value)
-        self.page.go("/records/" + get_date(datetime.now()))
+        self.dlg_view_record.open_dlg()
 
     def select_date(self, _):
         date = get_date(self.date_picker.value)
@@ -272,6 +312,10 @@ class CreateRecordView(RecordView):
         else:
             edit_record(date, self.doc_field.value)
             self.page.go("/records/" + date)
+
+    def keyboard_event_handler(self, e: ft.KeyboardEvent):
+        if e.ctrl and e.key == "S":
+            self.save(e)
 
     def init(self):
         self.route = "/create-record"

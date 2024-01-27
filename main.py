@@ -1,8 +1,4 @@
-import os
-from os.path import exists
-import flet as ft
-
-from controls import MainView, CreateRecordView, SelectRecordView, SettingsView
+from views import *
 from diary import exists_record, get_date
 from datetime import datetime
 from storage import init_storage

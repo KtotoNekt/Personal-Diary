@@ -24,8 +24,8 @@ class BackgroundImage(ft.Container):
 class CustomAlertDialog(ft.AlertDialog):
     def __init__(self, page: ft.Page,
                  title: str, content: str,
-                 confirm_action: ft.TextButton,
-                 cancel_action: ft.TextButton = None):
+                 confirm_action: ft.TextButton = None,
+                 cancel_action: ft.TextButton = None,):
 
         if not cancel_action:
             cancel_action = ft.TextButton("Отмена", on_click=lambda _: self.page.close_dialog())

@@ -1,8 +1,13 @@
 from flet_contrib.color_picker import ColorPicker
 from os.path import isdir
-from diary import *
 from datetime import datetime
 from controls import *
+from encryption import *
+from diary import *
+
+
+def validate_file_picker_result(files):
+    return files and len(files) != 0 and not isdir(files[0].path)
 
 
 class CustomView(ft.View):
@@ -10,8 +15,10 @@ class CustomView(ft.View):
         super().__init__()
 
         self.hadnler_error = handler_error
+
         self.page = page
         self.page.on_keyboard_event = self._keyboard_event_handler
+        self.page.overlay.clear()
 
         self.init()
 
@@ -40,20 +47,18 @@ class MainView(CustomView):
         self.file_picker = ft.FilePicker(on_result=self.select_file)
         self.dialog_success_import = ft.AlertDialog(
             title=ft.Text("Успех!"),
-            content=ft.Text("Запись успешно импортирована!"),
-            actions=[
-                ft.TextButton("Ок", on_click=self.toggle_banner)
-            ],
+            content=ft.Text("Запись успешно импортирована!")
         )
 
         super().__init__(handler_error, page)
 
     def toggle_banner(self, _):
         self.dialog_success_import.open = not self.dialog_success_import.open
+        self.page.dialog = self.dialog_success_import
         self.page.update()
 
     def select_file(self, e):
-        if e.files and len(e.files) != 0 and not isdir(e.files[0].path):
+        if validate_file_picker_result(e.files):
             self.import_date_picker.pick_date()
 
     def select_import_date(self, _):
@@ -113,12 +118,10 @@ class MainView(CustomView):
         column = ft.Column(rows, alignment=ft.MainAxisAlignment.CENTER, spacing=20)
 
         self.route = "/"
+        for control in [self.date_picker, self.file_picker, self.import_date_picker,]:
+            self.page.overlay.append(control)
         self.controls = [
                 ft.Container(column, height=500),
-                self.date_picker,
-                self.file_picker,
-                self.import_date_picker,
-                self.dialog_success_import
         ]
         self.appbar = CustomAppBar("Личный дневник", ft.icons.MENU_BOOK)
 
@@ -160,7 +163,9 @@ class SelectRecordView(RecordView):
         )
 
         self.doc_field.read_only = True
-        self.doc_field.value = read_record(date)
+        
+        content = read_record(date, self.storage.crypto_key)
+        self.doc_field.value = content
         self.first_value = self.doc_field.value
 
     def cancel(self, _):
@@ -182,6 +187,8 @@ class SelectRecordView(RecordView):
     def save(self, _):
         content = self.doc_field.value
         edit_record(self.date, content)
+        if_encryption_enable(self.storage, self.date)
+
         self.first_value = content
 
         self.toggle_buttons()
@@ -228,6 +235,7 @@ class CreateRecordView(RecordView):
 
     def save(self, _):
         create_record(self.doc_field.value)
+        if_encryption_enable(self.storage, get_date(datetime.now()))
         self.dlg_view_record.open_dlg()
 
     def select_date(self, _):
@@ -236,6 +244,7 @@ class CreateRecordView(RecordView):
             self.hadnler_error("Под этой датой уже есть запись")
         else:
             edit_record(date, self.doc_field.value)
+            if_encryption_enable(self.storage, get_date(date))
             self.page.go("/records/" + date)
 
     def keyboard_event_handler(self, e: ft.KeyboardEvent):
@@ -258,10 +267,10 @@ class SettingsView(CustomView):
 
         self.bg_image = ft.Image(width=200,
                                  height=200,
-                                 src=self.storage.background_image,
                                  fit=ft.ImageFit.COVER, border_radius=25)
-        if not self.storage.background_image:
-            self.bg_image.visible = False
+        self.bg_image.visible = bool(self.storage.background_image)
+        if self.storage.background_image:
+            self.bg_image.src = self.storage.background_image
 
         self.font_family_field = ft.TextField(label="Название шрифта",
                                               value=self.storage.font_family,
@@ -284,7 +293,49 @@ class SettingsView(CustomView):
             ft.dropdown.Option("end", "По концу"),
         ], value=self.storage.text_align)
 
+        self.encryption_enable = ft.Checkbox(label="Включить шифрование записей",
+                                             value=self.storage.encryption_enable,
+                                             on_change=self.toggle_visible_encryption_container)
+        self.file_save_key_picker = ft.FilePicker(on_result=self.select_file_key, )
+        self.file_load_key_picker = ft.FilePicker(on_result=self.load_crypto_key)
+        self.column_encryption = ft.Column([
+            ft.ElevatedButton(
+                "Выбрать файл с ключем",
+                on_click=lambda _: self.file_load_key_picker.pick_files(dialog_title="Выберите файл с ключем")
+            ),
+            ft.ElevatedButton(
+                "Сгенерировать и сохранить ключ",
+                on_click=lambda _: self.file_save_key_picker.save_file(dialog_title="Сохраните ключ шифрования"))
+        ], visible=self.storage.encryption_enable, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+        self.dlg_warning = ft.AlertDialog(title=ft.Text("Предупреждение"),
+                                          content=ft.Text("При включенном шифровании при каждом заходе в приложение "
+                                                          "будет требоваться выбрать файл с ключем, который будет "
+                                                          "использоваться для расшифровки зашифрованых записей, "
+                                                          "и для шифрования новых записей"))
+
         super().__init__(handler_error, page)
+
+    def load_crypto_key(self, e):
+        if validate_file_picker_result(e.files):
+            try:
+                self.storage.crypto_key = get_key(e.files[0].path)
+            except ValueError:
+                self.hadnler_error("Неверный формат ключа")
+
+    def open_dlg(self):
+        self.dlg_warning.open = True
+        self.page.dialog = self.dlg_warning
+
+    def select_file_key(self, e: ft.FilePickerResultEvent):
+        if e.path:
+            crypto_key = generate_and_save_key(e.path)
+            self.storage.crypto_key = crypto_key
+
+    def toggle_visible_encryption_container(self, _):
+        self.column_encryption.visible = not self.column_encryption.visible
+        if self.column_encryption.visible:
+            self.open_dlg()
+        self.page.update()
 
     def change_font_family(self, _):
         self.font_family_field.text_style.font_family = self.font_family_field.value
@@ -295,18 +346,26 @@ class SettingsView(CustomView):
         self.font_size_field.update()
 
     def select_background(self, e: ft.FilePickerResultEvent):
-        if e.files and len(e.files) != 0 and not isdir(e.files[0].path):
+        if validate_file_picker_result(e.files):
             self.storage.background_image = e.files[0].path
             self.bg_image.src = e.files[0].path
+            self.bg_image.visible = bool(self.storage.background_image)
+            self.page.update(self.bg_image)
 
     def save(self, _):
         self.storage.font_family = self.font_family_field.value
         self.storage.font_size = self.font_size_field.value
         self.storage.font_color = self.font_color_picker.color
         self.storage.text_align = self.text_align_dropdown.value
+        self.storage.encryption_enable = self.encryption_enable.value
 
         self.storage.save()
         self.page.go("/")
+
+    def delete_background(self, _):
+        self.storage.background_image = ""
+        self.bg_image.visible = bool(self.storage.background_image)
+        self.page.update(self.bg_image)
 
     def init(self):
         background_image_text = ft.Text("Задний фон", size=18)
@@ -315,6 +374,10 @@ class SettingsView(CustomView):
             text="Изменить" if self.storage.background_image else "Задать",
             icon=ft.icons.IMAGE,
             on_click=lambda _: self.file_picker.pick_files(file_type=ft.FilePickerFileType.IMAGE)
+        )
+        background_image_delete_button = ft.ElevatedButton(
+            "Удалить задний фон",
+            on_click=self.delete_background
         )
 
         font_text = ft.Text("Шрифт", size=18)
@@ -328,11 +391,14 @@ class SettingsView(CustomView):
             on_click=self.save,
         )
 
+        text_encryption = ft.Text("Шифрование", size=18)
+
         columns = []
-        for controls in [[background_image_text, self.bg_image, background_image_button],
+        for controls in [[background_image_text, self.bg_image, background_image_button, background_image_delete_button],
                          [font_text, self.font_family_field, self.font_size_field,
                           font_color_text, self.font_color_picker],
-                         [text_align_title, self.text_align_dropdown]]:
+                         [text_align_title, self.text_align_dropdown,
+                          text_encryption, self.encryption_enable, self.column_encryption]]:
             rows = []
             for control in controls:
                 rows.append(ft.Row([control], alignment=ft.MainAxisAlignment.CENTER))
@@ -340,10 +406,11 @@ class SettingsView(CustomView):
             columns.append(ft.Column(rows))
 
         self.route = "/settings"
+        for control in [self.file_picker, self.file_save_key_picker, self.file_load_key_picker]:
+            self.page.overlay.append(control)
         self.controls = [
                 ft.GridView(columns, expand=1,
                             runs_count=3),
                 ft.Row([save_button], alignment=ft.MainAxisAlignment.CENTER),
-                self.file_picker
             ]
         self.appbar = CustomAppBar("Настройки")

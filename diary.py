@@ -5,6 +5,7 @@ from odf import text, teletype
 from odf.opendocument import load
 from os.path import abspath, join, exists, splitext
 from datetime import datetime
+from encryption import decrypt_file
 
 
 def _read_odt(filepath: str):
@@ -29,7 +30,7 @@ def _read_txt(filepath: str):
     return content
 
 
-def _write_txt(path: str, content: str):
+def _write_txt(path: str, content):
     with open(path, "w") as fp:
         fp.write(content)
 
@@ -59,18 +60,28 @@ def import_record(date: str, filepath: str):
     _write_txt(_get_filepath(date), content)
 
 
-def read_record(date: str):
-    return _read_txt(_get_filepath(date))
+def read_record(date: str, key=None):
+    path = _get_filepath(date)
+    if key:
+        try:
+            return decrypt_file(key, path)
+        except:
+            print("Файл не удалось расшифровать")
+
+    return _read_txt(path)
+
+
+def _modify_record(date: str, content: str):
+    path = _get_filepath(date)
+    _write_txt(path, content)
 
 
 def create_record(content: str):
-    filename = _get_filepath(get_date(datetime.now()))
-    _write_txt(filename, content)
+    _modify_record(get_date(datetime.now()), content)
 
 
 def edit_record(date: str, content: str):
-    filename = _get_filepath(date)
-    _write_txt(filename, content)
+    _modify_record(date, content)
 
 
 def delete_record(date: str):

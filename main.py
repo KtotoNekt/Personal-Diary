@@ -14,7 +14,6 @@ def main(page: ft.Page):
         page.views.clear()
         page.views.append(
             MainView(open_dialog_error, page)
-            # ft.View()
         )
 
         troute = ft.TemplateRoute(page.route)
@@ -58,6 +57,16 @@ def main(page: ft.Page):
     page.on_view_pop = view_pop
 
     page.go("/")
+
+    if storage.encryption_enable and not storage.crypto_key:
+        def select_crypt_key(e: ft.FilePickerResultEvent):
+            if validate_file_picker_result(e.files):
+                storage.crypto_key = get_key(e.files[0].path)
+
+        file_crypt_key_picker = ft.FilePicker(on_result=select_crypt_key)
+        page.overlay.append(file_crypt_key_picker)
+        page.update()
+        file_crypt_key_picker.pick_files("Ключ шифрования")
 
 
 ft.app(target=main)

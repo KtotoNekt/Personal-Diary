@@ -9,15 +9,18 @@ class ClientStorage:
         self.page = page
         self.storage = page.client_storage
 
-        self.background_image = self.get("background-image", "Не задан")
+        self.background_image = self.get("background-image", "")
         self.font_family = self.get("font-family", "Times New Roman")
         self.font_size = self.get('font-size', 18)
         self.font_color = self.get("font-color", "#000000")
         self.text_align = self.get("text-align", "center")
+        self.encryption_enable = self.get("encryption-enable", False)
+
+        self.crypto_key = None
 
     def save(self):
         for attribute in self.__dir__()[2:]:
-            if attribute == "__module__":
+            if attribute == "crypto_key":
                 break
 
             self.set(attribute.replace("_", "-"), self.__getattribute__(attribute))

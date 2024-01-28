@@ -203,7 +203,11 @@ class SelectRecordView(RecordView):
             self.save(e)
 
     def init(self):
-        delete_button = ft.IconButton(ft.icons.DELETE_FOREVER, on_click=lambda _: self.dlg_confirm.open_dlg())
+        delete_button = ft.IconButton(
+            ft.icons.DELETE_FOREVER,
+            on_click=lambda _: self.dlg_confirm.open_dlg(),
+            tooltip="Удалить запись"
+        )
 
         self.route = "/records/" + self.date
         self.appbar = CustomAppBar("Запись " + self.date, None,

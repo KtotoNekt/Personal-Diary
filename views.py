@@ -244,7 +244,7 @@ class CreateRecordView(RecordView):
             self.hadnler_error("Под этой датой уже есть запись")
         else:
             edit_record(date, self.doc_field.value)
-            if_encryption_enable(self.storage, get_date(date))
+            if_encryption_enable(self.storage, date)
             self.page.go("/records/" + date)
 
     def keyboard_event_handler(self, e: ft.KeyboardEvent):

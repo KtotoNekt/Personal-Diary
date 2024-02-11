@@ -6,6 +6,8 @@ from storage import init_storage
 
 if not exists("records"):
     os.mkdir("records")
+if not exists("cdn"):
+    os.mkdir("cdn")
 
 
 def main(page: ft.Page):

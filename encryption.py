@@ -51,7 +51,3 @@ def decrypt_file(f: Fernet, path: str):
         content = fp.read()
 
     return f.decrypt(content).decode()
-
-
-# encrypt_file(get_key("crypto.key"), "2024-01-26.txt", False)
-# print(decrypt_file(get_key("crypto.key"), "2024-01-26.txt"))

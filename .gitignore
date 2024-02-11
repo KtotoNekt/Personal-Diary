@@ -3,3 +3,4 @@ venv
 __pycache__/
 test-flet.py
 records/*.txt
+cdn/

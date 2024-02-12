@@ -131,7 +131,15 @@ class RecordView(CustomView, ABC):
         self.page.overlay.clear()
 
         self.doc_field = DocumentField(self.page, self.storage, self.appbar)
+        self.change_mode_select_button = ft.IconButton(
+            icon=ft.icons.CHECK_BOX,
+            tooltip="Режим выбора элементов (Ctrl + D)",
+            on_click=lambda _: self.doc_field.change_mode_select()
+        )
+
         self.controls.append(BackgroundImage(self.storage.background_image, self.doc_field))
+
+        self.appbar.actions.append(self.change_mode_select_button)
 
         self.padding = 0
         self.spacing = 51
@@ -145,7 +153,7 @@ class SelectRecordView(RecordView):
     def __init__(self, handler_error, page, date: str):
         self.date = date
 
-        self.edit_button = ft.IconButton(ft.icons.EDIT, on_click=self.edit, tooltip="Редактировать")
+        self.edit_button = ft.IconButton(ft.icons.EDIT, on_click=lambda _: self.toggle_buttons(), tooltip="Редактировать")
         self.save_button = ft.IconButton(ft.icons.SAVE, on_click=self.save, tooltip="Сохранить", visible=False)
         self.cancel_button = ft.IconButton(ft.icons.CANCEL, visible=False,
                                            on_click=self.cancel, tooltip="Сбросить до первоначального вида")
@@ -158,6 +166,7 @@ class SelectRecordView(RecordView):
             content="Данная операция не обратима. Вы точно хотите удалить данную запись?",
             confirm_action=ft.TextButton("Да, удалите эту запись", on_click=self.delete_record),
         )
+        self.change_mode_select_button.visible = False
 
         content = read_record(date, self.storage.crypto_key)
         self.doc_field.value = content
@@ -171,14 +180,12 @@ class SelectRecordView(RecordView):
     def toggle_buttons(self):
         self.edit_button.visible = not self.edit_button.visible
         self.save_button.visible = not self.save_button.visible
+        self.change_mode_select_button.visible = not self.change_mode_select_button.visible
 
         self.cancel_button.visible = not self.cancel_button.visible
 
         self.doc_field.read_only = not self.doc_field.read_only
         self.page.update()
-
-    def edit(self, _):
-        self.toggle_buttons()
 
     def save(self, _):
         content = self.doc_field.value

@@ -144,10 +144,7 @@ class DocumentField(ft.Column):
             ft.PopupMenuItem(
                 icon=ft.icons.IMAGE,
                 text="Изображение",
-                on_click=lambda _: self.file_picker.pick_files(
-                    "Выберите изображение",
-                    file_type=ft.FilePickerFileType.IMAGE,
-                ),
+                on_click=lambda _: self._open_dialog(self.dlg_select_image)
             ),
             ft.PopupMenuItem(
                 icon=ft.icons.TEXT_FIELDS,
@@ -183,7 +180,8 @@ class DocumentField(ft.Column):
                     self.height_image,
                     self.image
                 ],
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                height=430
             ),
             actions=[
                 ft.ElevatedButton("Добавить", on_click=self._action_add),
@@ -191,6 +189,35 @@ class DocumentField(ft.Column):
             ],
             actions_alignment=ft.MainAxisAlignment.CENTER,
             modal=True
+        )
+
+        def continue_link_image(e):
+            self.image.src = self.__link_image.value
+            self._close_dialog(self.dlg_select_image)
+            self._open_dialog(self.dlg_settings_image)
+
+        self.__check_box_copy_image = ft.Checkbox(label="Копировать файл изображения в хранилище", value=False)
+        self.__link_image = ft.TextField(label="Ссылка", tooltip="Вставьте ссылку на изображение")
+        self.dlg_select_image = ft.AlertDialog(
+            title=ft.Text("Откуда загрузить"),
+            content=ft.Column(
+                [
+                    ft.Row([
+                        ft.ElevatedButton(
+                            "С файловой системы",
+                            on_click=lambda _: self.file_picker.pick_files(
+                                "Выберите изображение",
+                                file_type=ft.FilePickerFileType.IMAGE,
+                            )
+                        ),
+                        self.__check_box_copy_image
+                    ]),
+                    ft.Row([
+                        self.__link_image,
+                        ft.ElevatedButton("Продолжить", on_click=continue_link_image)
+                    ])
+                ], height=100
+            )
         )
 
         for control in [self.file_picker]:
@@ -220,10 +247,13 @@ class DocumentField(ft.Column):
     def _save_file(self, e: ft.FilePickerResultEvent):
         if validate_file_picker_result(e.files):
             file = e.files[0]
-            _, ext = splitext(file.name)
+            if self.__check_box_copy_image.value:
+                _, ext = splitext(file.name)
 
-            cdn_path = os.path.join("cdn", str(uuid.uuid4()) + ext)
-            shutil.copy(file.path, cdn_path)
+                cdn_path = os.path.join("cdn", str(uuid.uuid4()) + ext)
+                shutil.copy(file.path, cdn_path)
+            else:
+                cdn_path = e.files[0].path
 
             match self.file_picker.file_type:
                 case ft.FilePickerFileType.IMAGE:
